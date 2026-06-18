@@ -4,47 +4,33 @@ Outhon Interpreter
 
 from parser import (
     Program, Block, Statement,
-    # Expressions
     IntLiteral, FloatLiteral, StringLiteral, BoolLiteral,
     VariableGet, FunctionCall, BinaryOp, UnaryOp,
-    # Orders
     VariableDecl, Assignment, FunctionDecl, IfStatement, WhileLoop,
 )
 from error_handler import report_error, errty
 
 
-# ============================================================
-# Runtime values
-# ============================================================
-
 class OuthonFunction:
-    """A user-defined function value."""
     def __init__(self, name: str, params: list, body: Block, closure: "Environment"):
         self.name = name
         self.params = params
         self.body = body
-        self.closure = closure   # lexical scope at definition time
+        self.closure = closure
 
     def __repr__(self):
         return f"<function {self.name}>"
 
 
 class ReturnSignal(Exception):
-    """Used to unwind the call stack on a return statement (future use)."""
     def __init__(self, value):
         self.value = value
 
-
-# ============================================================
-# Environment (scope chain)
-# ============================================================
 
 class Environment:
     def __init__(self, parent: "Environment | None" = None):
         self._vars: dict = {}
         self.parent = parent
-
-    # ---- variable lookup ----
 
     def get(self, name: str, line=None, char=None):
         if name in self._vars:
@@ -59,11 +45,9 @@ class Environment:
         return None
 
     def set(self, name: str, value):
-        """Define a new variable in the current scope."""
         self._vars[name] = value
 
     def assign(self, name: str, value, line=None, char=None):
-        """Update an existing variable, walking up the scope chain."""
         if name in self._vars:
             self._vars[name] = value
             return
@@ -76,10 +60,6 @@ class Environment:
             line, char
         )
 
-
-# ============================================================
-# Built-ins
-# ============================================================
 
 def _builtin_print(*args):
     print(*args)
@@ -145,24 +125,12 @@ def build_global_env() -> Environment:
     return env
 
 
-# ============================================================
-# Interpreter
-# ============================================================
-
 class Interpreter:
     def __init__(self):
         self.global_env = build_global_env()
 
-    # ----------------------------------------------------------
-    # Entry point
-    # ----------------------------------------------------------
-
     def run(self, program: Program):
         self.exec_block_in_env(program.body, self.global_env)
-
-    # ----------------------------------------------------------
-    # Block / statement execution
-    # ----------------------------------------------------------
 
     def exec_block(self, block: Block, env: Environment):
         self.exec_block_in_env(block.body, env)
@@ -174,12 +142,7 @@ class Interpreter:
     def exec_statement(self, stmt: Statement, env: Environment):
         self.exec_node(stmt.value, env)
 
-    # ----------------------------------------------------------
-    # Node dispatch
-    # ----------------------------------------------------------
-
     def exec_node(self, node, env: Environment):
-        # Orders
         if isinstance(node, VariableDecl):
             return self.exec_var_decl(node, env)
         if isinstance(node, Assignment):
@@ -190,12 +153,7 @@ class Interpreter:
             return self.exec_if(node, env)
         if isinstance(node, WhileLoop):
             return self.exec_while(node, env)
-        # Expressions (used as statements)
         return self.eval_expr(node, env)
-
-    # ----------------------------------------------------------
-    # Orders
-    # ----------------------------------------------------------
 
     def exec_var_decl(self, node: VariableDecl, env: Environment):
         value = self.eval_expr(node.value, env)
@@ -223,10 +181,6 @@ class Interpreter:
     def exec_while(self, node: WhileLoop, env: Environment):
         while self._truthy(self.eval_expr(node.condition, env)):
             self.exec_block(node.body, Environment(env))
-
-    # ----------------------------------------------------------
-    # Expression evaluation
-    # ----------------------------------------------------------
 
     def eval_expr(self, node, env: Environment):
         if isinstance(node, IntLiteral):
@@ -260,16 +214,11 @@ class Interpreter:
         )
         return None
 
-    # ----------------------------------------------------------
-    # Binary operators
-    # ----------------------------------------------------------
-
     def eval_binop(self, node: BinaryOp, env: Environment):
         left  = self.eval_expr(node.left,  env)
         right = self.eval_expr(node.right, env)
         op    = node.op
 
-        # Arithmetic
         if op == "+":
             if isinstance(left, str) or isinstance(right, str):
                 return _builtin_str(left) + _builtin_str(right)
@@ -283,14 +232,12 @@ class Interpreter:
             return left / right
         if op == "%":  return left % right
 
-        # Bitwise / shift
         if op == "&":  return int(left) & int(right)
         if op == "|":  return int(left) | int(right)
         if op == "^":  return int(left) ^ int(right)
         if op == "<<": return int(left) << int(right)
         if op == ">>": return int(left) >> int(right)
 
-        # Comparison
         if op == "==": return left == right
         if op == "!=": return left != right
         if op == ">":  return left > right
@@ -298,8 +245,6 @@ class Interpreter:
         if op == ">=": return left >= right
         if op == "<=": return left <= right
 
-        # Logical (short-circuit not needed since both sides are already evaluated,
-        # but keeping behaviour consistent with the language semantics)
         if op == "&&": return self._truthy(left) and self._truthy(right)
         if op == "||": return self._truthy(left) or  self._truthy(right)
 
@@ -309,10 +254,6 @@ class Interpreter:
             None, None
         )
         return None
-
-    # ----------------------------------------------------------
-    # Unary operators
-    # ----------------------------------------------------------
 
     def eval_unop(self, node: UnaryOp, env: Environment):
         val = self.eval_expr(node.expr, env)
@@ -327,19 +268,13 @@ class Interpreter:
         )
         return None
 
-    # ----------------------------------------------------------
-    # Function calls
-    # ----------------------------------------------------------
-
     def eval_call(self, node: FunctionCall, env: Environment):
         callee = self.eval_expr(node.callee, env)
         args   = [self.eval_expr(a, env) for a in node.args]
 
-        # Built-in (Python callable)
         if callable(callee) and not isinstance(callee, OuthonFunction):
             return callee(*args)
 
-        # User-defined function
         if isinstance(callee, OuthonFunction):
             if len(args) != len(callee.params):
                 report_error(
@@ -350,7 +285,6 @@ class Interpreter:
                 )
                 return None
 
-            # New scope chained to the closure (lexical scoping)
             call_env = Environment(callee.closure)
             for param, arg in zip(callee.params, args):
                 call_env.set(param, arg)
@@ -368,13 +302,8 @@ class Interpreter:
         )
         return None
 
-    # ----------------------------------------------------------
-    # Helpers
-    # ----------------------------------------------------------
-
     @staticmethod
     def _truthy(value) -> bool:
-        """Outhon truthiness: 0, 0.0, "", null, false → falsy."""
         if value is None:   return False
         if value is False:  return False
         if isinstance(value, (int, float)) and value == 0:
@@ -382,11 +311,6 @@ class Interpreter:
         if isinstance(value, str) and value == "":
             return False
         return True
-
-
-# ============================================================
-# Public entry point
-# ============================================================
 
 def interpret(program: Program):
     Interpreter().run(program)
