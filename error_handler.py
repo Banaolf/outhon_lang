@@ -7,12 +7,14 @@ from logging import error
 
 class errty(enum):
     SyntaxErr = 0,
-    ExpectationError = 1
+    ExpectationError = 1,
+    RuntimeError = 2
 
     def __str__(self):
         match self:
             case errty.SyntaxErr: return "SyntaxError"
             case errty.ExpectationError: return "ExpectationError"
+            case errty.RuntimeError: return "RuntimeError"
 
 _currenterr = None
 

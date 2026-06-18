@@ -3,7 +3,7 @@ Outhon Parser
 """
 
 from lexer import TokType
-from error_handler import report_error, errty
+from error_handler import report_error, errty, has_error
 
 # AST
 
@@ -193,6 +193,8 @@ def parse_tokens(tokens):
         if current.ty == TokType.EOF:
             break
         stmt = parse_statement()
+        if has_error():
+            return program
         if stmt is not None:
             program.body.append(stmt)
     return program
@@ -224,41 +226,36 @@ def parse_let():
     expect("let")
     name = current.value
     expect(TokType.Identifier)
-    # function declaration
+    if has_error(): return None
     if current.value == "(":
         params = []
         expect("(")
         while current.value != ")":
-
             params.append(current.value)
             expect(TokType.Identifier)
-
+            if has_error(): return None
             if current.value == ",":
                 expect(",")
         expect(")")
+        if has_error(): return None
         body = parse_block()
-        return FunctionDecl(
-            name,
-            params,
-            body
-        )
-    # variable declaration
+        if has_error(): return None
+        return FunctionDecl(name, params, body)
     expect("=")
+    if has_error(): return None
     value = parse_expression()
-    return VariableDecl(
-        name,
-        value
-    )
+    if has_error(): return None
+    return VariableDecl(name, value)
 
 
 def parse_block():
     block = Block()
     expect("{")
+    if has_error(): return block
     skip_newlines()
     while current.value != "}":
-        block.body.append(
-            parse_statement()
-        )
+        block.body.append(parse_statement())
+        if has_error(): return block
         skip_newlines()
     expect("}")
     return block
@@ -267,31 +264,36 @@ def parse_block():
 def parse_if():
     expect("if")
     expect("(")
+    if has_error(): return None
     condition = parse_expression()
+    if has_error(): return None
     expect(")")
+    if has_error(): return None
     then_block = parse_block()
+    if has_error(): return None
 
     elseif_clauses = []
     else_block = None
 
-    # Consume newlines between the closing `}` and a potential `else`
     skip_newlines()
 
     while current.ty == TokType.Keyword and current.value == "else":
-        _adv()  # consume `else`
-
+        _adv()
         if current.ty == TokType.Keyword and current.value == "if":
-            # `else if` branch
-            _adv()  # consume `if`
+            _adv()
             expect("(")
+            if has_error(): return None
             elseif_cond = parse_expression()
+            if has_error(): return None
             expect(")")
+            if has_error(): return None
             elseif_block = parse_block()
+            if has_error(): return None
             elseif_clauses.append((elseif_cond, elseif_block))
             skip_newlines()
         else:
-            # plain `else` — must be the last clause
             else_block = parse_block()
+            if has_error(): return None
             break
 
     return IfStatement(condition, then_block, elseif_clauses, else_block)
@@ -300,37 +302,33 @@ def parse_if():
 def parse_while():
     expect("while")
     expect("(")
+    if has_error(): return None
     condition = parse_expression()
+    if has_error(): return None
     expect(")")
+    if has_error(): return None
     body = parse_block()
+    if has_error(): return None
     return WhileLoop(condition, body)
 
 
 def parse_assignment():
     name = current.value
     expect(TokType.Identifier)
+    if has_error(): return None
     op = current.value
-    if current.ty in (
-        TokType.CompOperator,
-        TokType.CompBinOperator
-    ):
+    if current.ty in (TokType.CompOperator, TokType.CompBinOperator):
         expect(current.ty)
+        if has_error(): return None
         rhs = parse_expression()
+        if has_error(): return None
         base_op = op[:-1]
-        return Assignment(
-            name,
-            BinaryOp(
-                VariableGet(name),
-                base_op,
-                rhs
-            )
-        )
+        return Assignment(name, BinaryOp(VariableGet(name), base_op, rhs))
     expect("=")
+    if has_error(): return None
     value = parse_expression()
-    return Assignment(
-        name,
-        value
-    )
+    if has_error(): return None
+    return Assignment(name, value)
 
 
 # Expressions
@@ -483,7 +481,9 @@ def parse_primary():
 
     if tok.value == "(":
         expect("(")
+        if has_error(): return None
         expr = parse_expression()
+        if has_error(): return None
         expect(")")
         return expr
 
@@ -500,21 +500,18 @@ def parse_primary():
 def parse_identifier():
     name = current.value
     expect(TokType.Identifier)
+    if has_error(): return None
     expr = VariableGet(name)
     while current.value == "(":
         args = []
         expect("(")
+        if has_error(): return None
         while current.value != ")":
-            args.append(
-                parse_expression()
-            )
+            args.append(parse_expression())
+            if has_error(): return None
             if current.value == ",":
                 expect(",")
-
         expect(")")
-        expr = FunctionCall(
-            expr,
-            args
-        )
-
+        if has_error(): return None
+        expr = FunctionCall(expr, args)
     return expr

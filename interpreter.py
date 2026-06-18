@@ -8,7 +8,7 @@ from parser import (
     VariableGet, FunctionCall, BinaryOp, UnaryOp,
     VariableDecl, Assignment, FunctionDecl, IfStatement, WhileLoop,
 )
-from error_handler import report_error, errty
+from error_handler import report_error, errty, has_error, print_error
 
 
 class OuthonFunction:
@@ -37,11 +37,7 @@ class Environment:
             return self._vars[name]
         if self.parent is not None:
             return self.parent.get(name, line, char)
-        report_error(
-            f"Undefined variable '{name}'",
-            errty.RuntimeError,
-            line, char
-        )
+        report_error(f"Undefined variable '{name}'", errty.RuntimeError, line, char)
         return None
 
     def set(self, name: str, value):
@@ -54,11 +50,7 @@ class Environment:
         if self.parent is not None:
             self.parent.assign(name, value, line, char)
             return
-        report_error(
-            f"Assignment to undeclared variable '{name}'",
-            errty.RuntimeError,
-            line, char
-        )
+        report_error(f"Assignment to undeclared variable '{name}'", errty.RuntimeError, line, char)
 
 
 def _builtin_print(*args):
@@ -138,6 +130,7 @@ class Interpreter:
     def exec_block_in_env(self, stmts: list, env: Environment):
         for stmt in stmts:
             self.exec_statement(stmt, env)
+            if has_error(): return
 
     def exec_statement(self, stmt: Statement, env: Environment):
         self.exec_node(stmt.value, env)
@@ -196,7 +189,9 @@ class Interpreter:
             return node.value
 
         if isinstance(node, VariableGet):
-            return env.get(node.name)
+            val = env.get(node.name)
+            if has_error(): return None
+            return val
 
         if isinstance(node, BinaryOp):
             return self.eval_binop(node, env)
@@ -293,6 +288,7 @@ class Interpreter:
                 self.exec_block(callee.body, call_env)
             except ReturnSignal as ret:
                 return ret.value
+            if has_error(): return None
             return None
 
         report_error(
