@@ -5,9 +5,7 @@ Outhon Parser
 from lexer import TokType
 from error_handler import report_error, errty
 
-# ============================================================
 # AST
-# ============================================================
 
 class Node:
     pass
@@ -36,9 +34,7 @@ class Block(Node):
         self.body = []
 
 
-# ============================================================
 # Expressions
-# ============================================================
 
 class IntLiteral(Expression):
     def __init__(self, value: int):
@@ -84,9 +80,7 @@ class UnaryOp(Expression):
         self.expr = expr
 
 
-# ============================================================
 # Orders
-# ============================================================
 
 class VariableDecl(Order):
     def __init__(self, name: str, value):
@@ -127,18 +121,14 @@ class WhileLoop(Order):
         self.body = body
 
 
-# ============================================================
 # Parser State
-# ============================================================
 
 gTL = []
 pos = 0
 current = None
 
 
-# ============================================================
 # Helpers
-# ============================================================
 
 def _adv():
     global pos, current
@@ -190,9 +180,7 @@ def skip_newlines():
         _adv()
 
 
-# ============================================================
 # Entry
-# ============================================================
 
 def parse_tokens(tokens):
     global gTL, pos, current
@@ -210,9 +198,7 @@ def parse_tokens(tokens):
     return program
 
 
-# ============================================================
 # Statements
-# ============================================================
 
 def parse_statement():
     if current.ty == TokType.Keyword:
@@ -232,9 +218,7 @@ def parse_statement():
     return Statement(parse_expression())
 
 
-# ============================================================
 # Orders
-# ============================================================
 
 def parse_let():
     expect("let")
@@ -349,9 +333,7 @@ def parse_assignment():
     )
 
 
-# ============================================================
 # Expressions
-# ============================================================
 
 def parse_expression():
     return parse_bitwise()
